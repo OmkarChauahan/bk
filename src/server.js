@@ -16,10 +16,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable CORS
+// ⭐ CORS Configuration - Multiple origins allow karo
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'https://fr-eosin-eight.vercel.app',  // Your Vercel frontend
+    process.env.FRONTEND_URL
+  ].filter(Boolean), // Remove undefined values
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Mount routes
@@ -29,6 +35,8 @@ app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/inquiries', require('./routes/inquiryRoutes'));
 app.use('/api/services', require('./routes/serviceRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/quotations', require('./routes/quotationRoutes'));
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -61,3 +69,5 @@ process.on('unhandledRejection', (err, promise) => {
   console.log(`❌ Error: ${err.message}`);
   server.close(() => process.exit(1));
 });
+
+module.exports = app;
