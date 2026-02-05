@@ -9,12 +9,18 @@ const generateToken = (id) => {
   });
 };
 
+// ⭐ NEW - Generate Employee ID
+const generateEmployeeId = async () => {
+  const count = await User.countDocuments({ role: 'Employee' });
+  return `EMP${String(count + 1).padStart(4, '0')}`; // EMP0001, EMP0002...
+};
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -25,17 +31,28 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create user
+    // ⭐ NEW: Check if any admin exists
+    const adminExists = await User.findOne({ role: 'Admin' });
+    
+    // First user becomes Admin, rest are blocked
+    if (adminExists) {
+      return res.status(403).json({
+        success: false,
+        message: 'Registration is disabled. Please contact admin to create your account.'
+      });
+    }
+
+    // Create first admin
     const user = await User.create({
       name,
       email,
       password,
-      role: role || 'User'
+      role: 'Admin'
     });
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Please login with your credentials.',
+      message: 'Admin account created successfully!',
       data: {
         id: user._id,
         name: user.name,
@@ -75,6 +92,14 @@ exports.login = async (req, res) => {
       });
     }
 
+    // ⭐ NEW: Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your account has been deactivated. Please contact admin.'
+      });
+    }
+
     // Check if password matches
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
@@ -92,7 +117,10 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role, // ⭐ IMPORTANT: Send role to frontend
+        employeeId: user.employeeId,
+        department: user.department,
+        designation: user.designation,
         token
       }
     });
@@ -114,6 +142,85 @@ exports.getMe = async (req, res) => {
     res.status(200).json({
       success: true,
       data: user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ⭐ NEW FUNCTION - Create Employee (Admin Only)
+// @desc    Create employee
+// @route   POST /api/auth/create-employee
+// @access  Private/Admin
+exports.createEmployee = async (req, res) => {
+  try {
+    const { name, email, password, department, designation, joiningDate, salary } = req.body;
+
+    // Check if user exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+
+    // Generate employee ID
+    const employeeId = await generateEmployeeId();
+
+    // Create employee
+    const employee = await User.create({
+      name,
+      email,
+      password,
+      role: 'Employee',
+      employeeId,
+      department,
+      designation,
+      joiningDate: joiningDate || Date.now(),
+      salary,
+      createdBy: req.user.id // Admin who created
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Employee created successfully',
+      data: {
+        id: employee._id,
+        name: employee.name,
+        email: employee.email,
+        employeeId: employee.employeeId,
+        department: employee.department,
+        designation: employee.designation,
+        // ⭐ Send temp password to show admin (they'll share with employee)
+        tempPassword: password
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ⭐ NEW FUNCTION - Get All Employees (Admin Only)
+// @desc    Get all employees
+// @route   GET /api/auth/employees
+// @access  Private/Admin
+exports.getAllEmployees = async (req, res) => {
+  try {
+    const employees = await User.find({ role: 'Employee' })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: employees.length,
+      data: employees
     });
   } catch (error) {
     res.status(500).json({

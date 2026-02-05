@@ -22,13 +22,34 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'User', 'Manager'],
-    default: 'User'
+    enum: ['Admin', 'Employee'], // ⭐ CHANGED: Remove 'User', 'Manager'
+    default: 'Employee' // ⭐ CHANGED: Default is Employee
   },
-  status: {
+  // ⭐ NEW FIELDS for Employee
+  employeeId: {
     type: String,
-    enum: ['Active', 'Inactive', 'Pending'],
-    default: 'Active'
+    unique: true,
+    sparse: true // Only for employees
+  },
+  department: {
+    type: String,
+    enum: ['IT', 'HR', 'Sales', 'Marketing', 'Finance', 'Operations'],
+  },
+  designation: String,
+  joiningDate: {
+    type: Date,
+    default: Date.now
+  },
+  salary: Number,
+  // ⭐ RENAMED: status -> isActive (better for role-based)
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  // ⭐ NEW: Track who created this employee
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   avatar: {
     type: String,

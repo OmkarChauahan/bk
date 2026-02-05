@@ -40,7 +40,7 @@ const serviceSchema = new mongoose.Schema({
 
 // Virtual for formatted price (backward compatibility)
 serviceSchema.virtual('formattedPrice').get(function() {
-  return `₹${this.price.toLocaleString('en-IN')}`;
+  return this.price ? this.price.toLocaleString() : '0';
 });
 
 // Enable virtuals in JSON
