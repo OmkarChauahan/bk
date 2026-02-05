@@ -16,13 +16,15 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ⭐ CORS Configuration - Multiple origins allow karo
+
+// ⭐ CORS Configuration - Domain add karo
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://fr-eosin-eight.vercel.app',  // Your Vercel frontend
+    'https://fr-eosin-eight.vercel.app',
+    'https://admin.onenestconnect.in',  // ✅ Ye add karo
     process.env.FRONTEND_URL
-  ].filter(Boolean), // Remove undefined values
+  ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
