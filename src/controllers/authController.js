@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { sendWelcomeEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -117,7 +118,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role, // ⭐ IMPORTANT: Send role to frontend
+        role: user.role,
         employeeId: user.employeeId,
         department: user.department,
         designation: user.designation,
@@ -187,9 +188,32 @@ exports.createEmployee = async (req, res) => {
     // Fetch created employee with tempPassword
     const createdEmployee = await User.findById(employee._id);
 
+    // ⭐⭐⭐ SEND WELCOME EMAIL WITH CREDENTIALS ⭐⭐⭐
+    console.log('📧 Attempting to send welcome email...');
+    try {
+      const emailResult = await sendWelcomeEmail({
+        name: createdEmployee.name,
+        email: createdEmployee.email,
+        employeeId: createdEmployee.employeeId,
+        tempPassword: createdEmployee.tempPassword,
+        department: createdEmployee.department,
+        designation: createdEmployee.designation
+      });
+
+      if (emailResult.success) {
+        console.log('✅ Email sent successfully!');
+        console.log('📬 Email ID:', emailResult.messageId);
+      } else {
+        console.error('❌ Email sending failed:', emailResult.error);
+      }
+    } catch (emailError) {
+      console.error('❌ Email error:', emailError.message);
+      // Don't fail the employee creation if email fails
+    }
+
     res.status(201).json({
       success: true,
-      message: 'Employee created successfully',
+      message: 'Employee created successfully! Welcome email has been sent to their inbox.',
       data: {
         _id: createdEmployee._id,
         name: createdEmployee.name,
@@ -209,8 +233,6 @@ exports.createEmployee = async (req, res) => {
   }
 };
 
-
-// ⭐ NEW FUNCTION - Get All Employees (Admin Only)
 // @desc    Get all employees
 // @route   GET /api/auth/employees
 // @access  Private/Admin
@@ -269,15 +291,33 @@ exports.forgotPassword = async (req, res) => {
     // Create reset url (for frontend)
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    // For development: Send token in response
-    // In production: Send email with resetUrl
-    res.status(200).json({
-      success: true,
-      message: 'Password reset token sent',
-      // Remove this in production, send via email instead
-      resetToken: resetToken,
-      resetUrl: resetUrl
-    });
+    // ⭐⭐⭐ SEND PASSWORD RESET EMAIL ⭐⭐⭐
+    console.log('📧 Sending password reset email...');
+    try {
+      const emailResult = await sendPasswordResetEmail(user.email, user.name, resetUrl);
+      
+      if (emailResult.success) {
+        console.log('✅ Password reset email sent successfully!');
+        res.status(200).json({
+          success: true,
+          message: 'Password reset email sent successfully! Please check your inbox.'
+        });
+      } else {
+        throw new Error('Email sending failed');
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send password reset email:', emailError);
+      
+      // Clear the reset token if email fails
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.'
+      });
+    }
 
   } catch (error) {
     res.status(500).json({
