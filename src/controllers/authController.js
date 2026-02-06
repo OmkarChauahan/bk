@@ -151,7 +151,6 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// ⭐ NEW FUNCTION - Create Employee (Admin Only)
 // @desc    Create employee
 // @route   POST /api/auth/create-employee
 // @access  Private/Admin
@@ -182,30 +181,34 @@ exports.createEmployee = async (req, res) => {
       designation,
       joiningDate: joiningDate || Date.now(),
       salary,
-      createdBy: req.user.id // Admin who created
+      createdBy: req.user.id
     });
+
+    // Fetch created employee with tempPassword
+    const createdEmployee = await User.findById(employee._id);
 
     res.status(201).json({
       success: true,
       message: 'Employee created successfully',
       data: {
-        id: employee._id,
-        name: employee.name,
-        email: employee.email,
-        employeeId: employee.employeeId,
-        department: employee.department,
-        designation: employee.designation,
-        // ⭐ Send temp password to show admin (they'll share with employee)
-        tempPassword: password
+        _id: createdEmployee._id,
+        name: createdEmployee.name,
+        email: createdEmployee.email,
+        employeeId: createdEmployee.employeeId,
+        department: createdEmployee.department,
+        designation: createdEmployee.designation,
+        tempPassword: createdEmployee.tempPassword
       }
     });
   } catch (error) {
+    console.error('Error creating employee:', error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
+
 
 // ⭐ NEW FUNCTION - Get All Employees (Admin Only)
 // @desc    Get all employees

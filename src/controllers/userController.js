@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { createNotification } = require('./notificationController');
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Admin
@@ -34,9 +35,26 @@ exports.getUser = async (req, res) => {
       });
     }
     
+    // ✅ Response me sab kuch bhejo including tempPassword
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.isActive ? 'Active' : 'Inactive',  // ✅ isActive ko status me convert
+      employeeId: user.employeeId,
+      department: user.department,
+      designation: user.designation,
+      salary: user.salary,
+      tempPassword: user.tempPassword,  // ✅ Plain password admin ko dikhane ke liye
+      joinDate: user.joinDate,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+    
     res.status(200).json({
       success: true,
-      data: user
+      data: userData
     });
   } catch (error) {
     res.status(500).json({
@@ -66,8 +84,25 @@ exports.createUser = async (req, res) => {
       name,
       email,
       password,
-      role
+      role,
+      tempPassword: password  // ✅ Plain password save karo
     });
+    
+    // Create notification for admin
+    try {
+      const adminUsers = await User.find({ role: 'Admin' });
+      for (const admin of adminUsers) {
+        await createNotification(
+          admin._id,
+          'New User Registered',
+          `${user.name} (${user.email}) has registered to the platform`,
+          'user',
+          `/users/${user._id}`
+        );
+      }
+    } catch (notifError) {
+      console.log('Notification error:', notifError.message);
+    }
     
     res.status(201).json({
       success: true,
@@ -89,9 +124,13 @@ exports.updateUser = async (req, res) => {
     const fieldsToUpdate = {
       name: req.body.name,
       email: req.body.email,
-      role: req.body.role,
-      status: req.body.status
+      role: req.body.role
     };
+
+    // ✅ status ko isActive me convert karo
+    if (req.body.status) {
+      fieldsToUpdate.isActive = req.body.status === 'Active';
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,
@@ -139,34 +178,6 @@ exports.deleteUser = async (req, res) => {
       success: true,
       data: {},
       message: 'User deleted successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
-exports.createUser = async (req, res) => {
-  try {
-    // Create user logic here
-    const newUser = await User.create(req.body);
-    
-    // Create notification for admin
-    const adminId = '64a1b2c3d4e5f6g7h8i9j0k1'; // Replace with actual admin ID
-    await createNotification(
-      adminId,
-      'New User Registered',
-      `${newUser.name} (${newUser.email}) has registered to the platform`,
-      'user',
-      `/users/${newUser._id}`
-    );
-    
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      data: newUser
     });
   } catch (error) {
     res.status(500).json({

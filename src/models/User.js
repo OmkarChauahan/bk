@@ -4,76 +4,70 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Name is required'],
-    trim: true
+    required: true
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email']
+    required: true,
+    unique: true
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters'],
+    required: true,
     select: false
+  },
+  // ⭐ YE FIELD ADD KARO - Plain password store karne ke liye
+  tempPassword: {
+    type: String,
+    default: null
   },
   role: {
     type: String,
-    enum: ['Admin', 'Employee'], // ⭐ CHANGED: Remove 'User', 'Manager'
-    default: 'Employee' // ⭐ CHANGED: Default is Employee
+    enum: ['Admin', 'Employee', 'User', 'Manager'],
+    default: 'Employee'
   },
-  // ⭐ NEW FIELDS for Employee
-  employeeId: {
-    type: String,
-    unique: true,
-    sparse: true // Only for employees
-  },
-  department: {
-    type: String,
-    enum: ['IT', 'HR', 'Sales', 'Marketing', 'Finance', 'Operations'],
-  },
+  employeeId: String,
+  department: String,
   designation: String,
-  joiningDate: {
-    type: Date,
-    default: Date.now
-  },
+  joiningDate: Date,
   salary: Number,
-  // ⭐ RENAMED: status -> isActive (better for role-based)
   isActive: {
     type: Boolean,
     default: true
   },
-  // ⭐ NEW: Track who created this employee
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  avatar: {
-    type: String,
-    default: ''
-  },
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
+  avatar: String,
   joinDate: {
     type: Date,
     default: Date.now
-  }
+  },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date
 }, {
   timestamps: true
 });
 
-// Hash password before saving
+// ⭐ YE PRE-SAVE HOOK UPDATE KARO
 userSchema.pre('save', async function(next) {
+  // Agar password modify nahi hua to skip karo
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
-  this.password = await bcrypt.hash(this.password, 10);
+
+  // ⭐ PEHLE plain password save karo
+  this.tempPassword = this.password;
+  
+  // Phir hash karo
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  
+  next();
 });
 
-// Compare password method
+// Password comparison method
 userSchema.methods.comparePassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
