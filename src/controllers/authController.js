@@ -10,10 +10,10 @@ const generateToken = (id) => {
   });
 };
 
-// ⭐ NEW - Generate Employee ID
+// Generate Employee ID
 const generateEmployeeId = async () => {
   const count = await User.countDocuments({ role: 'Employee' });
-  return `EMP${String(count + 1).padStart(4, '0')}`; // EMP0001, EMP0002...
+  return `EMP${String(count + 1).padStart(4, '0')}`;
 };
 
 // @desc    Register new user
@@ -23,7 +23,6 @@ exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({
@@ -32,10 +31,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    // ⭐ NEW: Check if any admin exists
     const adminExists = await User.findOne({ role: 'Admin' });
     
-    // First user becomes Admin, rest are blocked
     if (adminExists) {
       return res.status(403).json({
         success: false,
@@ -43,7 +40,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create first admin
     const user = await User.create({
       name,
       email,
@@ -76,7 +72,6 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate email & password
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -84,7 +79,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check for user
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({
@@ -93,7 +87,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // ⭐ NEW: Check if user is active
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
@@ -101,7 +94,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check if password matches
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
@@ -122,6 +114,7 @@ exports.login = async (req, res) => {
         employeeId: user.employeeId,
         department: user.department,
         designation: user.designation,
+        profilePicture: user.profilePicture,  // ⭐ PROFILE PICTURE BHI SEND KARO
         token
       }
     });
@@ -142,7 +135,7 @@ exports.getMe = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: user
+      data: user  // ⭐ Isme automatically profilePicture bhi jayega
     });
   } catch (error) {
     res.status(500).json({
@@ -159,7 +152,6 @@ exports.createEmployee = async (req, res) => {
   try {
     const { name, email, password, department, designation, joiningDate, salary } = req.body;
 
-    // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({
@@ -168,10 +160,8 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
-    // Generate employee ID
     const employeeId = await generateEmployeeId();
 
-    // Create employee
     const employee = await User.create({
       name,
       email,
@@ -185,10 +175,8 @@ exports.createEmployee = async (req, res) => {
       createdBy: req.user.id
     });
 
-    // Fetch created employee with tempPassword
     const createdEmployee = await User.findById(employee._id);
 
-    // ⭐⭐⭐ SEND WELCOME EMAIL WITH CREDENTIALS ⭐⭐⭐
     console.log('📧 Attempting to send welcome email...');
     try {
       const emailResult = await sendWelcomeEmail({
@@ -208,7 +196,6 @@ exports.createEmployee = async (req, res) => {
       }
     } catch (emailError) {
       console.error('❌ Email error:', emailError.message);
-      // Don't fail the employee creation if email fails
     }
 
     res.status(201).json({
@@ -271,27 +258,21 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Hash token and set to resetPasswordToken field
     const resetPasswordToken = crypto
       .createHash('sha256')
       .update(resetToken)
       .digest('hex');
 
-    // Set expire time (10 minutes)
     const resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
-    // Save to user
     user.resetPasswordToken = resetPasswordToken;
     user.resetPasswordExpire = resetPasswordExpire;
     await user.save({ validateBeforeSave: false });
 
-    // Create reset url (for frontend)
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-    // ⭐⭐⭐ SEND PASSWORD RESET EMAIL ⭐⭐⭐
     console.log('📧 Sending password reset email...');
     try {
       const emailResult = await sendPasswordResetEmail(user.email, user.name, resetUrl);
@@ -308,7 +289,6 @@ exports.forgotPassword = async (req, res) => {
     } catch (emailError) {
       console.error('❌ Failed to send password reset email:', emailError);
       
-      // Clear the reset token if email fails
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false });
@@ -334,7 +314,6 @@ exports.resetPassword = async (req, res) => {
   try {
     const { password } = req.body;
 
-    // Get hashed token
     const resetPasswordToken = crypto
       .createHash('sha256')
       .update(req.params.resetToken)
@@ -352,7 +331,6 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    // Set new password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -387,7 +365,6 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Check if email is being changed and if it already exists
     if (email && email !== user.email) {
       const emailExists = await User.findOne({ email });
       if (emailExists) {
@@ -433,7 +410,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Check current password
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({
@@ -442,7 +418,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Set new password
     user.password = newPassword;
     await user.save();
 
@@ -452,6 +427,112 @@ exports.changePassword = async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ⭐⭐⭐ PROFILE PICTURE FUNCTIONS - YEH 2 FUNCTIONS ADD KARO ⭐⭐⭐
+
+// @desc    Upload/Update profile picture
+// @route   PUT /api/auth/upload-profile-picture
+// @access  Private
+exports.uploadProfilePicture = async (req, res) => {
+  try {
+    const { profilePicture } = req.body;
+
+    // Validation: Check if profilePicture is provided
+    if (!profilePicture) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a profile picture'
+      });
+    }
+
+    // Validation: Check if it's a valid base64 image
+    if (!profilePicture.startsWith('data:image')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format. Please upload a valid image.'
+      });
+    }
+
+    // Validation: Check file size (base64 string length ≈ file size × 1.37)
+    // 5MB limit = ~6.85MB in base64
+    const maxSize = 6850000; // Approximately 5MB
+    if (profilePicture.length > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: 'Image size should be less than 5MB'
+      });
+    }
+
+    // Find user
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update profile picture
+    user.profilePicture = profilePicture;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture updated successfully! ✅',
+      data: {
+        profilePicture: user.profilePicture
+      }
+    });
+
+  } catch (error) {
+    console.error('Error uploading profile picture:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Remove profile picture
+// @route   DELETE /api/auth/remove-profile-picture
+// @access  Private
+exports.removeProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if profile picture exists
+    if (!user.profilePicture) {
+      return res.status(400).json({
+        success: false,
+        message: 'No profile picture to remove'
+      });
+    }
+
+    // Remove profile picture
+    user.profilePicture = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture removed successfully! 🗑️'
+    });
+
+  } catch (error) {
+    console.error('Error removing profile picture:', error);
     res.status(500).json({
       success: false,
       message: error.message

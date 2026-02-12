@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
     required: true,
     select: false
   },
-  // ⭐ YE FIELD ADD KARO - Plain password store karne ke liye
+  // ⭐ Plain password store karne ke liye (temporary)
   tempPassword: {
     type: String,
     default: null
@@ -40,6 +40,13 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   avatar: String,
+  
+  // ⭐⭐⭐ PROFILE PICTURE FIELD - YEH ADD KARO ⭐⭐⭐
+  profilePicture: {
+    type: String,  // Base64 image string store hoga
+    default: null
+  },
+  
   joinDate: {
     type: Date,
     default: Date.now
@@ -50,17 +57,17 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ⭐ YE PRE-SAVE HOOK UPDATE KARO
+// Password hashing middleware
 userSchema.pre('save', async function(next) {
   // Agar password modify nahi hua to skip karo
   if (!this.isModified('password')) {
     return next();
   }
 
-  // ⭐ PEHLE plain password save karo
+  // Plain password save karo (temporary use ke liye)
   this.tempPassword = this.password;
   
-  // Phir hash karo
+  // Hash the password
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   

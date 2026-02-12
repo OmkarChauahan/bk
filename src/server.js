@@ -16,14 +16,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-// ⭐ CORS Configuration - Domain add karo
+// ⭐ CORS Configuration
 app.use(cors({
   origin: [
     'http://localhost:3000',
     'https://fr-eosin-eight.vercel.app',
     'https://admin.onenestconnect.in',
-    'https://admin.onenestconnect.com',  // ✅ Ye add karo
+    'https://admin.onenestconnect.com',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true,
@@ -40,6 +39,10 @@ app.use('/api/services', require('./routes/serviceRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/quotations', require('./routes/quotationRoutes'));
+
+// ⭐⭐⭐ NEW ROUTES - Task & Attendance ⭐⭐⭐
+app.use('/api/tasks', require('./routes/taskRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
 
 // Health check route
 app.get('/health', (req, res) => {
