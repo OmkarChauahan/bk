@@ -17,9 +17,8 @@ const taskSchema = new mongoose.Schema({
     required: [true, 'Task must be assigned to an employee']
   },
   assignedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    type: String,  // Changed from ObjectId to String
+    required: [true, 'Assigned by name is required']
   },
   priority: {
     type: String,
@@ -28,7 +27,7 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'In Progress', 'Completed', 'Cancelled'],
+    enum: ['Pending', 'In Progress', 'Completed', 'Not Completed', 'Cancelled'],
     default: 'Pending'
   },
   dueDate: {

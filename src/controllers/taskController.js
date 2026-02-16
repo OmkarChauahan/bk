@@ -7,10 +7,10 @@ const User = require('../models/User');
 // @access  Private/Admin
 exports.createTask = async (req, res) => {
   try {
-    const { title, description, assignedTo, priority, dueDate } = req.body;
+    const { title, description, assignedTo, assignedBy, priority, dueDate } = req.body;
 
     // Validation
-    if (!title || !description || !assignedTo || !dueDate) {
+    if (!title || !description || !assignedTo || !assignedBy || !dueDate) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields'
@@ -30,15 +30,14 @@ exports.createTask = async (req, res) => {
       title,
       description,
       assignedTo,
-      assignedBy: req.user._id,
+      assignedBy, // This will now be the admin's name as string
       priority: priority || 'Medium',
       dueDate,
       status: 'Pending'
     });
 
     const populatedTask = await Task.findById(task._id)
-      .populate('assignedTo', 'name email employeeId')
-      .populate('assignedBy', 'name email');
+      .populate('assignedTo', 'name email employeeId');
 
     res.status(201).json({
       success: true,
@@ -58,12 +57,34 @@ exports.createTask = async (req, res) => {
 // @desc    Get all tasks
 // @route   GET /api/tasks/all
 // @access  Private/Admin
+// backend/controllers/taskController.js
+
 exports.getAllTasks = async (req, res) => {
   try {
-    const tasks = await Task.find()
+    let tasks = await Task.find()
       .populate('assignedTo', 'name email employeeId')
-      .populate('assignedBy', 'name email')
+      .populate('assignedBy', 'name')  // 🔥 ADD THIS LINE
       .sort({ createdAt: -1 });
+
+    // Convert to plain objects and normalize assignedBy
+    tasks = tasks.map(task => {
+      const taskObj = task.toObject();
+      
+      // Handle assignedBy conversion
+      if (taskObj.assignedBy) {
+        if (typeof taskObj.assignedBy === 'object' && taskObj.assignedBy.name) {
+          taskObj.assignedBy = taskObj.assignedBy.name;
+        } else if (typeof taskObj.assignedBy === 'object' && taskObj.assignedBy._id) {
+          // If ObjectId but no name populated, use 'Admin'
+          taskObj.assignedBy = 'Admin';
+        }
+        // If already string, leave as is
+      } else {
+        taskObj.assignedBy = 'Admin';
+      }
+      
+      return taskObj;
+    });
 
     res.json({
       success: true,
@@ -85,7 +106,6 @@ exports.getAllTasks = async (req, res) => {
 exports.getMyTasks = async (req, res) => {
   try {
     const tasks = await Task.find({ assignedTo: req.user._id })
-      .populate('assignedBy', 'name email')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -135,8 +155,7 @@ exports.updateTaskStatus = async (req, res) => {
     await task.save();
 
     const updatedTask = await Task.findById(task._id)
-      .populate('assignedTo', 'name email employeeId')
-      .populate('assignedBy', 'name email');
+      .populate('assignedTo', 'name email employeeId');
 
     res.json({
       success: true,
