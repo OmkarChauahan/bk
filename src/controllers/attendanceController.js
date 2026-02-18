@@ -9,31 +9,23 @@ exports.markAttendance = async (req, res) => {
   try {
     console.log('📋 Mark Attendance Request:', req.body);
     console.log('Admin User:', req.user.name);
-    
+
     const { employeeId, date, status, checkIn, checkOut, remarks } = req.body;
 
-    // Validation
     if (!employeeId || !date || !status) {
-      console.log('❌ Missing fields:', { employeeId: !!employeeId, date: !!date, status: !!status });
       return res.status(400).json({
         success: false,
         message: 'Employee, date, and status are required'
       });
     }
 
-    // Parse date properly
     const [year, month, day] = date.split('-');
     const attendanceDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    console.log('Date comparison:', {
-      input: date,
-      attendanceDate: attendanceDate.toISOString(),
-      today: today.toISOString(),
-      isFuture: attendanceDate > today
-    });
+    const today = new Date();
+const istOffset = 5.5 * 60 * 60 * 1000;
+const istDate = new Date(today.getTime() + istOffset);
+istDate.setUTCHours(0, 0, 0, 0);
 
     if (attendanceDate > today) {
       return res.status(400).json({
@@ -42,50 +34,34 @@ exports.markAttendance = async (req, res) => {
       });
     }
 
-    // Check if employee exists
     const employee = await User.findById(employeeId);
     if (!employee) {
-      console.log('❌ Employee not found:', employeeId);
-      return res.status(404).json({
-        success: false,
-        message: 'Employee not found'
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
-    console.log('✅ Employee found:', employee.name);
-
-    // Check if attendance already exists
     let attendance = await Attendance.findOne({
       employee: employeeId,
       date: attendanceDate
     });
 
     if (attendance) {
-      // ⭐ ADMIN CAN UPDATE ⭐
-      console.log('📝 Updating existing attendance from', attendance.status, 'to', status);
-      
-      attendance.status = status;
-      attendance.checkIn = checkIn || attendance.checkIn;
+      attendance.status   = status;
+      attendance.checkIn  = checkIn  || attendance.checkIn;
       attendance.checkOut = checkOut || attendance.checkOut;
-      attendance.remarks = remarks || attendance.remarks;
+      attendance.remarks  = remarks  || attendance.remarks;
       attendance.markedBy = req.user.id;
-      
       await attendance.save();
-      
       console.log('✅ Attendance UPDATED by Admin:', employee.name, '→', status);
     } else {
-      // Create new attendance
-      console.log('➕ Creating new attendance');
       attendance = await Attendance.create({
         employee: employeeId,
-        date: attendanceDate,
+        date:     attendanceDate,
         status,
-        checkIn: checkIn || '10:00',
-        checkOut: checkOut || '18:00',
+        checkIn:  checkIn  || '-',
+        checkOut: checkOut || '-',
         markedBy: req.user.id,
-        remarks: remarks || ''
+        remarks:  remarks  || ''
       });
-      
       console.log('✅ Attendance CREATED by Admin:', employee.name, '→', status);
     }
 
@@ -95,15 +71,12 @@ exports.markAttendance = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: attendance ? 'Attendance updated successfully' : 'Attendance marked successfully',
+      message: 'Attendance marked successfully',
       data: populatedAttendance
     });
   } catch (error) {
     console.error('❌ Mark Attendance Error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to mark attendance'
-    });
+    res.status(500).json({ success: false, message: error.message || 'Failed to mark attendance' });
   }
 };
 
@@ -112,46 +85,24 @@ exports.markAttendance = async (req, res) => {
 // ============================================
 exports.getAllAttendance = async (req, res) => {
   try {
-    console.log('📊 Fetching all attendance records...');
-    
     const { startDate, endDate, employeeId, status } = req.query;
-    
-    // Build filter
+
     const filter = {};
-    
     if (startDate && endDate) {
-      filter.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+      filter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
-    
-    if (employeeId) {
-      filter.employee = employeeId;
-    }
-    
-    if (status) {
-      filter.status = status;
-    }
+    if (employeeId) filter.employee = employeeId;
+    if (status)     filter.status   = status;
 
     const attendance = await Attendance.find(filter)
       .populate('employee', 'name email employeeId department')
       .populate('markedBy', 'name email')
       .sort({ date: -1 });
 
-    console.log(`✅ Found ${attendance.length} attendance records`);
-
-    res.status(200).json({
-      success: true,
-      count: attendance.length,
-      data: attendance
-    });
+    res.status(200).json({ success: true, count: attendance.length, data: attendance });
   } catch (error) {
     console.error('❌ Get All Attendance Error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch attendance records'
-    });
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch attendance' });
   }
 };
 
@@ -161,28 +112,23 @@ exports.getAllAttendance = async (req, res) => {
 exports.getMyAttendance = async (req, res) => {
   try {
     console.log('👤 Fetching attendance for:', req.user.name);
-    
+
     const { startDate, endDate } = req.query;
-    
+
     const filter = { employee: req.user.id };
-    
+
     if (startDate && endDate) {
       filter.date = {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
-    } else {
-      // Default: last 30 days
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      filter.date = { $gte: thirtyDaysAgo };
     }
 
     const attendance = await Attendance.find(filter)
       .populate('markedBy', 'name email')
       .sort({ date: -1 });
 
-    console.log(`✅ Found ${attendance.length} attendance records for ${req.user.name}`);
+    console.log(`✅ Found ${attendance.length} records for ${req.user.name}`);
 
     res.status(200).json({
       success: true,
@@ -191,72 +137,196 @@ exports.getMyAttendance = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Get My Attendance Error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fetch your attendance'
-    });
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch attendance' });
   }
 };
 
 // ============================================
-// EMPLOYEE: Auto Mark Attendance (Self Check-in)
+// EMPLOYEE: Auto Mark Attendance on Login
+// ✅ Supports: Present / Absent / LoggedIn
+// ✅ Saves: checkIn, expectedCheckOut fields
 // ============================================
 exports.autoMarkAttendance = async (req, res) => {
   try {
     console.log('🤖 Auto-marking attendance for:', req.user.name);
-    
+    console.log('   Body received:', req.body);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Check if already marked today
-    const existingAttendance = await Attendance.findOne({
+    // Already marked today?
+    const existing = await Attendance.findOne({
       employee: req.user.id,
       date: today
     });
 
-    if (existingAttendance) {
-      console.log('⚠️ Attendance already marked for today');
-      return res.status(400).json({
-        success: false,
-        message: 'Attendance already marked for today',
-        data: existingAttendance
+    if (existing) {
+      console.log('⚠️ Already marked today:', existing.status);
+      return res.status(200).json({
+        success:       false,
+        alreadyMarked: true,
+        message:       'Attendance already marked for today',
+        data:          existing
       });
     }
 
-    // Get current time for check-in
-    const now = new Date();
-    const checkInTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const {
+      status:           frontendStatus,
+      checkIn:          frontendCheckIn,
+      expectedCheckOut: frontendExpectedCheckOut,
+      remarks:          frontendRemarks,
+    } = req.body;
 
-    // Auto-determine status based on check-in time
-    const workStartHour = 10; // 10 AM
-    const isLate = now.getHours() > workStartHour || 
-                   (now.getHours() === workStartHour && now.getMinutes() > 15);
+    // Server-side time fallback
+    const now        = new Date();
+    const serverH    = now.getHours();
+    const serverM    = now.getMinutes();
+    const serverTime = `${String(serverH).padStart(2,'0')}:${String(serverM).padStart(2,'0')}`;
+
+    // ✅ Accept: 'Present', 'Absent', 'LoggedIn'
+    const allowedStatuses = ['Present', 'Absent', 'LoggedIn'];
+    const finalStatus = allowedStatuses.includes(frontendStatus)
+      ? frontendStatus
+      : (serverH < 11 || (serverH === 11 && serverM === 0)) ? 'Present' : 'Absent';
+
+    const finalCheckIn = frontendCheckIn || serverTime;
+
+    // Default remarks based on status
+    let finalRemarks = frontendRemarks || '';
+    if (!finalRemarks) {
+      if (finalStatus === 'Absent')   finalRemarks = 'Late login — auto marked absent';
+      else if (finalStatus === 'LoggedIn') finalRemarks = 'Logged in — checkout pending';
+      else                            finalRemarks = 'Auto-marked on login';
+    }
 
     const attendance = await Attendance.create({
-      employee: req.user.id,
-      date: today,
-      status: isLate ? 'Late' : 'Present',
-      checkIn: checkInTime,
-      markedBy: req.user.id,
-      remarks: isLate ? 'Marked late by system' : 'Auto-marked by employee'
+      employee:         req.user.id,
+      date:             today,
+      status:           finalStatus,
+      checkIn:          finalCheckIn,              // ✅ actual login time saved
+      checkOut:         null,
+      expectedCheckOut: frontendExpectedCheckOut || null, // ✅ expected checkout saved
+      markedBy:         req.user.id,
+      remarks:          finalRemarks,
     });
 
-    const populatedAttendance = await Attendance.findById(attendance._id)
+    const populated = await Attendance.findById(attendance._id)
       .populate('employee', 'name email employeeId');
 
-    console.log(`✅ Auto-marked attendance: ${req.user.name} → ${attendance.status}`);
+    console.log(`✅ Auto-marked: ${req.user.name} → ${finalStatus} at ${finalCheckIn}`);
 
     res.status(201).json({
       success: true,
-      message: `Attendance marked as ${attendance.status}`,
-      data: populatedAttendance
+      message: `Attendance marked as ${finalStatus}`,
+      data:    populated
     });
+
   } catch (error) {
-    console.error('❌ Auto Mark Attendance Error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to mark attendance'
-    });
+    console.error('❌ Auto Mark Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================
+// EMPLOYEE: Checkout → Mark as Present
+// POST /api/attendance/checkout
+// ============================================
+exports.checkoutAttendance = async (req, res) => {
+  try {
+    console.log('🚪 Checkout request for:', req.user.name);
+    console.log('   Body:', req.body);
+
+    const { date, checkOut, status } = req.body;
+
+    if (!date || !checkOut) {
+      return res.status(400).json({
+        success: false,
+        message: 'date and checkOut are required'
+      });
+    }
+
+    const [year, month, day] = date.split('-');
+    const attendanceDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+
+    // ✅ 'employee' field use karo — 'user' nahi
+    const record = await Attendance.findOneAndUpdate(
+      {
+        employee: req.user.id,
+        date:     attendanceDate,
+      },
+      {
+        $set: {
+          checkOut: checkOut,
+          status:   status || 'Present',
+          remarks:  'Checked out — marked Present',
+        },
+      },
+      { new: true }
+    );
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found for today. Please refresh and try again.',
+      });
+    }
+
+    console.log(`✅ Checkout successful: ${req.user.name} at ${checkOut} → Present`);
+    res.status(200).json({ success: true, data: record });
+
+  } catch (error) {
+    console.error('❌ Checkout Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================
+// EMPLOYEE: Update CheckIn Time
+// (Jab DB mein '-' tha — fix karo)
+// PATCH /api/attendance/update-checkin
+// ============================================
+exports.updateCheckIn = async (req, res) => {
+  try {
+    console.log('🕐 UpdateCheckIn request for:', req.user.name);
+    console.log('   Body:', req.body);
+
+    const { date, checkIn } = req.body;
+
+    if (!date || !checkIn) {
+      return res.status(400).json({
+        success: false,
+        message: 'date and checkIn are required'
+      });
+    }
+
+    const [year, month, day] = date.split('-');
+    const attendanceDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+
+    // ✅ 'employee' field use karo — 'user' nahi
+    const record = await Attendance.findOneAndUpdate(
+      {
+        employee: req.user.id,
+        date:     attendanceDate,
+      },
+      {
+        $set: { checkIn: checkIn },
+      },
+      { new: true }
+    );
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: 'Attendance record not found',
+      });
+    }
+
+    console.log(`✅ CheckIn updated: ${req.user.name} → ${checkIn}`);
+    res.status(200).json({ success: true, data: record });
+
+  } catch (error) {
+    console.error('❌ UpdateCheckIn Error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -266,29 +336,18 @@ exports.autoMarkAttendance = async (req, res) => {
 exports.deleteAttendance = async (req, res) => {
   try {
     console.log('🗑️ Deleting attendance record:', req.params.id);
-    
+
     const attendance = await Attendance.findById(req.params.id);
-    
     if (!attendance) {
-      return res.status(404).json({
-        success: false,
-        message: 'Attendance record not found'
-      });
+      return res.status(404).json({ success: false, message: 'Attendance record not found' });
     }
 
     await attendance.deleteOne();
-    
     console.log('✅ Attendance record deleted');
 
-    res.status(200).json({
-      success: true,
-      message: 'Attendance record deleted successfully'
-    });
+    res.status(200).json({ success: true, message: 'Attendance record deleted successfully' });
   } catch (error) {
     console.error('❌ Delete Attendance Error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to delete attendance record'
-    });
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete attendance' });
   }
 };

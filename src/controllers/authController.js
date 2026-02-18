@@ -10,10 +10,36 @@ const generateToken = (id) => {
   });
 };
 
-// Generate Employee ID
+// Generate Employee ID - FIXED
+// Pehle wala countDocuments use karta tha - agar employee delete ho toh same ID dobara generate hoti thi
+// Ab last highest employeeId dhundhta hai aur +1 karta hai, plus unique check bhi hai
 const generateEmployeeId = async () => {
-  const count = await User.countDocuments({ role: 'Employee' });
-  return `EMP${String(count + 1).padStart(4, '0')}`;
+  // Sabse badi employeeId wala record dhundho
+  const lastEmployee = await User.findOne(
+    { employeeId: { $exists: true, $ne: null } },
+    { employeeId: 1 }
+  ).sort({ employeeId: -1 });
+
+  let nextNum = 1;
+  if (lastEmployee && lastEmployee.employeeId) {
+    const lastNum = parseInt(lastEmployee.employeeId.replace('EMP', ''), 10);
+    if (!isNaN(lastNum)) nextNum = lastNum + 1;
+  }
+
+  // Unique milne tak retry karo (race condition se bhi safe)
+  let employeeId;
+  let isUnique = false;
+  while (!isUnique) {
+    employeeId = `EMP${String(nextNum).padStart(4, '0')}`;
+    const exists = await User.findOne({ employeeId });
+    if (!exists) {
+      isUnique = true;
+    } else {
+      nextNum++;
+    }
+  }
+
+  return employeeId;
 };
 
 // @desc    Register new user
@@ -114,7 +140,7 @@ exports.login = async (req, res) => {
         employeeId: user.employeeId,
         department: user.department,
         designation: user.designation,
-        profilePicture: user.profilePicture,  // ⭐ PROFILE PICTURE BHI SEND KARO
+        profilePicture: user.profilePicture,
         token
       }
     });
@@ -135,7 +161,7 @@ exports.getMe = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: user  // ⭐ Isme automatically profilePicture bhi jayega
+      data: user
     });
   } catch (error) {
     res.status(500).json({
@@ -150,7 +176,7 @@ exports.getMe = async (req, res) => {
 // @access  Private/Admin
 exports.createEmployee = async (req, res) => {
   try {
-    const { name, email, password, department, designation, joiningDate, salary } = req.body;
+    const { name, email, password, department, designation, joiningDate, salary, phone, address, workingType } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -172,6 +198,9 @@ exports.createEmployee = async (req, res) => {
       designation,
       joiningDate: joiningDate || Date.now(),
       salary,
+      phone: phone || '',
+      address: address || '',
+      workingType: workingType || 'Office',
       createdBy: req.user.id
     });
 
@@ -208,6 +237,9 @@ exports.createEmployee = async (req, res) => {
         employeeId: createdEmployee.employeeId,
         department: createdEmployee.department,
         designation: createdEmployee.designation,
+        phone: createdEmployee.phone,
+        address: createdEmployee.address,
+        workingType: createdEmployee.workingType,
         tempPassword: createdEmployee.tempPassword
       }
     });
@@ -434,8 +466,6 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// ⭐⭐⭐ PROFILE PICTURE FUNCTIONS - YEH 2 FUNCTIONS ADD KARO ⭐⭐⭐
-
 // @desc    Upload/Update profile picture
 // @route   PUT /api/auth/upload-profile-picture
 // @access  Private
@@ -443,7 +473,6 @@ exports.uploadProfilePicture = async (req, res) => {
   try {
     const { profilePicture } = req.body;
 
-    // Validation: Check if profilePicture is provided
     if (!profilePicture) {
       return res.status(400).json({
         success: false,
@@ -451,7 +480,6 @@ exports.uploadProfilePicture = async (req, res) => {
       });
     }
 
-    // Validation: Check if it's a valid base64 image
     if (!profilePicture.startsWith('data:image')) {
       return res.status(400).json({
         success: false,
@@ -459,9 +487,7 @@ exports.uploadProfilePicture = async (req, res) => {
       });
     }
 
-    // Validation: Check file size (base64 string length ≈ file size × 1.37)
-    // 5MB limit = ~6.85MB in base64
-    const maxSize = 6850000; // Approximately 5MB
+    const maxSize = 6850000;
     if (profilePicture.length > maxSize) {
       return res.status(400).json({
         success: false,
@@ -469,7 +495,6 @@ exports.uploadProfilePicture = async (req, res) => {
       });
     }
 
-    // Find user
     const user = await User.findById(req.user.id);
 
     if (!user) {
@@ -479,7 +504,6 @@ exports.uploadProfilePicture = async (req, res) => {
       });
     }
 
-    // Update profile picture
     user.profilePicture = profilePicture;
     await user.save();
 
@@ -514,7 +538,6 @@ exports.removeProfilePicture = async (req, res) => {
       });
     }
 
-    // Check if profile picture exists
     if (!user.profilePicture) {
       return res.status(400).json({
         success: false,
@@ -522,7 +545,6 @@ exports.removeProfilePicture = async (req, res) => {
       });
     }
 
-    // Remove profile picture
     user.profilePicture = null;
     await user.save();
 
