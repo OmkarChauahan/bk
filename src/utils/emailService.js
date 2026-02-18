@@ -1,7 +1,9 @@
 const { Resend } = require('resend');
 
 // Initialize Resend with API key
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY 
+  ? new Resend(process.env.RESEND_API_KEY) 
+  : null;
 
 /**
  * Send welcome email with credentials to new employee

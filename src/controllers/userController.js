@@ -7,17 +7,14 @@ const { createNotification } = require('./notificationController');
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find().sort({ createdAt: -1 });
-    
+
     res.status(200).json({
       success: true,
       count: users.length,
       data: users
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -27,40 +24,35 @@ exports.getUsers = async (req, res) => {
 exports.getUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    
+
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
-    // ✅ Response me sab kuch bhejo including tempPassword
+
     const userData = {
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      status: user.isActive ? 'Active' : 'Inactive',  // ✅ isActive ko status me convert
+      status: user.isActive ? 'Active' : 'Inactive',
       employeeId: user.employeeId,
       department: user.department,
       designation: user.designation,
       salary: user.salary,
-      tempPassword: user.tempPassword,  // ✅ Plain password admin ko dikhane ke liye
+      tempPassword: user.tempPassword,
       joinDate: user.joinDate,
       createdAt: user.createdAt,
-      updatedAt: user.updatedAt
+      updatedAt: user.updatedAt,
+
+      // ✅ NEW FIELDS
+      phone: user.phone || null,
+      address: user.address || null,
+      workingType: user.workingType || 'Office',
     };
-    
-    res.status(200).json({
-      success: true,
-      data: userData
-    });
+
+    res.status(200).json({ success: true, data: userData });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -69,15 +61,18 @@ exports.getUser = async (req, res) => {
 // @access  Private/Admin
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const {
+      name, email, password, role,
+      department, designation, salary,
+      joiningDate,
+      // ✅ NEW FIELDS
+      phone, address, workingType
+    } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists'
-      });
+      return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
     const user = await User.create({
@@ -85,10 +80,18 @@ exports.createUser = async (req, res) => {
       email,
       password,
       role,
-      tempPassword: password  // ✅ Plain password save karo
+      tempPassword: password,
+      department,
+      designation,
+      salary,
+      joiningDate,
+      // ✅ NEW FIELDS
+      phone: phone || null,
+      address: address || null,
+      workingType: workingType || 'Office',
     });
-    
-    // Create notification for admin
+
+    // Notification for admin
     try {
       const adminUsers = await User.find({ role: 'Admin' });
       for (const admin of adminUsers) {
@@ -103,16 +106,10 @@ exports.createUser = async (req, res) => {
     } catch (notifError) {
       console.log('Notification error:', notifError.message);
     }
-    
-    res.status(201).json({
-      success: true,
-      data: user
-    });
+
+    res.status(201).json({ success: true, data: user });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -124,10 +121,19 @@ exports.updateUser = async (req, res) => {
     const fieldsToUpdate = {
       name: req.body.name,
       email: req.body.email,
-      role: req.body.role
+      role: req.body.role,
+      department: req.body.department,
+      designation: req.body.designation,
+      salary: req.body.salary,
+      joiningDate: req.body.joiningDate,
+
+      // ✅ NEW FIELDS
+      phone: req.body.phone || null,
+      address: req.body.address || null,
+      workingType: req.body.workingType || 'Office',
     };
 
-    // ✅ status ko isActive me convert karo
+    // status → isActive convert
     if (req.body.status) {
       fieldsToUpdate.isActive = req.body.status === 'Active';
     }
@@ -135,28 +141,16 @@ exports.updateUser = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       fieldsToUpdate,
-      {
-        new: true,
-        runValidators: true
-      }
+      { new: true, runValidators: true }
     );
-    
+
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
-    res.status(200).json({
-      success: true,
-      data: user
-    });
+
+    res.status(200).json({ success: true, data: user });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -166,23 +160,17 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
-    
+
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     res.status(200).json({
       success: true,
       data: {},
       message: 'User deleted successfully'
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

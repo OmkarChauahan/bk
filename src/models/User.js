@@ -16,7 +16,6 @@ const userSchema = new mongoose.Schema({
     required: true,
     select: false
   },
-  // ⭐ Plain password store karne ke liye (temporary)
   tempPassword: {
     type: String,
     default: null
@@ -31,6 +30,27 @@ const userSchema = new mongoose.Schema({
   designation: String,
   joiningDate: Date,
   salary: Number,
+
+  // ✅ PHONE & EXTRA FIELDS ADDED
+  phone: {
+    type: String,
+    default: null
+  },
+  address: {
+    type: String,
+    default: null
+  },
+  workingType: {
+    type: String,
+    enum: ['Office', 'Home', 'Hybrid'],
+    default: 'Office'
+  },
+  status: {
+    type: String,
+    enum: ['Active', 'Inactive'],
+    default: 'Active'
+  },
+
   isActive: {
     type: Boolean,
     default: true
@@ -40,13 +60,10 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   avatar: String,
-  
-  // ⭐⭐⭐ PROFILE PICTURE FIELD - YEH ADD KARO ⭐⭐⭐
   profilePicture: {
-    type: String,  // Base64 image string store hoga
+    type: String,
     default: null
   },
-  
   joinDate: {
     type: Date,
     default: Date.now
@@ -58,24 +75,15 @@ const userSchema = new mongoose.Schema({
 });
 
 // Password hashing middleware
-userSchema.pre('save', async function(next) {
-  // Agar password modify nahi hua to skip karo
-  if (!this.isModified('password')) {
-    return next();
-  }
-
-  // Plain password save karo (temporary use ke liye)
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
   this.tempPassword = this.password;
-  
-  // Hash the password
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  
   next();
 });
 
-// Password comparison method
-userSchema.methods.comparePassword = async function(enteredPassword) {
+userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
