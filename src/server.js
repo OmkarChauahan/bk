@@ -43,6 +43,8 @@ app.use('/api/quotations', require('./routes/quotationRoutes'));
 // ⭐⭐⭐ NEW ROUTES - Task & Attendance ⭐⭐⭐
 app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/documents', require('./routes/documentRoutes'));
+app.use('/api/leaves', require('./routes/leaveRoutes'));
 
 // Health check route
 app.get('/health', (req, res) => {

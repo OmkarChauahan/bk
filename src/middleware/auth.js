@@ -5,9 +5,10 @@ exports.protect = async (req, res, next) => {
   try {
     let token;
 
-    // Check if token exists in headers
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+    } else if (req.query.token) {
+      token = req.query.token; // ← YEH ADD KIYA — iframe/img ke liye
     }
 
     if (!token) {
@@ -18,10 +19,7 @@ exports.protect = async (req, res, next) => {
     }
 
     try {
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from token
       req.user = await User.findById(decoded.id).select('-password');
       
       if (!req.user) {
@@ -46,7 +44,6 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Admin only middleware
 exports.authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
