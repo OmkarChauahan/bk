@@ -40,6 +40,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  dateOfBirth: {          // ⭐ YEH ADD KARO
+  type: Date,
+  default: null
+},
+emergencyContact: {     // ⭐ YEH BHI ADD KARO
+  name:         { type: String, default: '' },
+  relationship: { type: String, default: '' },
+  phone:        { type: String, default: '' }
+},
   workingType: {
     type: String,
     enum: ['Office', 'Home', 'Hybrid'],

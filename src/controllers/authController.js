@@ -386,43 +386,22 @@ exports.resetPassword = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, phone, dateOfBirth, address, emergencyContact } = req.body;
 
     const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (email && email !== user.email) {
-      const emailExists = await User.findOne({ email });
-      if (emailExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email already in use'
-        });
-      }
-    }
-
-    user.name = name || user.name;
-    user.email = email || user.email;
+    if (name)             user.name = name;
+    if (phone)            user.phone = phone;
+    if (dateOfBirth)      user.dateOfBirth = dateOfBirth;
+    if (address)          user.address = address;
+    if (emergencyContact) user.emergencyContact = emergencyContact;
 
     await user.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: user
-    });
-
+    res.status(200).json({ success: true, message: 'Profile updated', data: user });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

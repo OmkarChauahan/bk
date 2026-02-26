@@ -152,7 +152,7 @@ exports.autoMarkAttendance = async (req, res) => {
     console.log('   Body received:', req.body);
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+today.setUTCHours(0, 0, 0, 0);
 
     // Already marked today?
     const existing = await Attendance.findOne({
