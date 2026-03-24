@@ -22,16 +22,14 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'Employee', 'User', 'Manager'],
-    default: 'Employee'
+    enum: ['Admin', 'user'],
+    default: 'user'
   },
   employeeId: String,
   department: String,
   designation: String,
   joiningDate: Date,
   salary: Number,
-
-  // ✅ PHONE & EXTRA FIELDS ADDED
   phone: {
     type: String,
     default: null
@@ -40,26 +38,20 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  dateOfBirth: {          // ⭐ YEH ADD KARO
-  type: Date,
-  default: null
-},
-emergencyContact: {     // ⭐ YEH BHI ADD KARO
-  name:         { type: String, default: '' },
-  relationship: { type: String, default: '' },
-  phone:        { type: String, default: '' }
-},
+  dateOfBirth: {
+    type: Date,
+    default: null
+  },
+  emergencyContact: {
+    name:         { type: String, default: '' },
+    relationship: { type: String, default: '' },
+    phone:        { type: String, default: '' }
+  },
   workingType: {
     type: String,
     enum: ['Office', 'Home', 'Hybrid'],
     default: 'Office'
   },
-  status: {
-    type: String,
-    enum: ['Active', 'Inactive'],
-    default: 'Active'
-  },
-
   isActive: {
     type: Boolean,
     default: true
@@ -83,7 +75,6 @@ emergencyContact: {     // ⭐ YEH BHI ADD KARO
   timestamps: true
 });
 
-// Password hashing middleware
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   this.tempPassword = this.password;

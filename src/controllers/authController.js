@@ -10,11 +10,7 @@ const generateToken = (id) => {
   });
 };
 
-// Generate Employee ID - FIXED
-// Pehle wala countDocuments use karta tha - agar employee delete ho toh same ID dobara generate hoti thi
-// Ab last highest employeeId dhundhta hai aur +1 karta hai, plus unique check bhi hai
 const generateEmployeeId = async () => {
-  // Sabse badi employeeId wala record dhundho
   const lastEmployee = await User.findOne(
     { employeeId: { $exists: true, $ne: null } },
     { employeeId: 1 }
@@ -26,7 +22,6 @@ const generateEmployeeId = async () => {
     if (!isNaN(lastNum)) nextNum = lastNum + 1;
   }
 
-  // Unique milne tak retry karo (race condition se bhi safe)
   let employeeId;
   let isUnique = false;
   while (!isUnique) {
@@ -192,7 +187,7 @@ exports.createEmployee = async (req, res) => {
       name,
       email,
       password,
-      role: 'Employee',
+      role: 'user',  // ✅ CHANGED: 'Employee' → 'user'
       employeeId,
       department,
       designation,
@@ -257,7 +252,7 @@ exports.createEmployee = async (req, res) => {
 // @access  Private/Admin
 exports.getAllEmployees = async (req, res) => {
   try {
-    const employees = await User.find({ role: 'Employee' })
+    const employees = await User.find({ role: 'user' })  // ✅ CHANGED: 'Employee' → 'user'
       .select('-password')
       .sort({ createdAt: -1 });
 
