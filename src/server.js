@@ -24,6 +24,7 @@ app.use(cors({
     'https://admin.onenestconnect.in',
     'https://admin.onenestconnect.com',
     'https://bhavesh-717tid889-bhaveshs-projects-ac966755.vercel.app',
+    'https://bhavesh-zeta.vercel.app',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true,
